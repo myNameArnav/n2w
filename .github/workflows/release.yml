@@ -1,0 +1,75 @@
+name: Build and Release CLI
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [ main ] # Trigger on pushes to the main branch
+
+# Sets permissions for the GITHUB_TOKEN to allow creating releases
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest # Use a standard Linux runner
+
+    steps:
+      # 1. Checkout the repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Set up Go environment
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21' # Specify your project's Go version
+
+      # 3. Generate a unique tag name based on timestamp
+      #    We use an 'id' so we can reference the output in later steps
+      - name: Generate release tag
+        id: tag_generator
+        run: echo "tag_name=release-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      # 4. Build the application for different platforms
+      - name: Build Go application
+        run: |
+          # Create a directory to store the builds
+          mkdir release-builds
+
+          # Build for Linux (amd64)
+          echo "Building for Linux amd64..."
+          GOOS=linux GOARCH=amd64 go build -o release-builds/n2w-linux-amd64 n2w.go
+
+          # Build for macOS (amd64)
+          echo "Building for macOS amd64..."
+          GOOS=darwin GOARCH=amd64 go build -o release-builds/n2w-macos-amd64 n2w.go
+
+          # Build for macOS (arm64 - Apple Silicon)
+          echo "Building for macOS arm64..."
+          GOOS=darwin GOARCH=arm64 go build -o release-builds/n2w-macos-arm64 n2w.go
+
+          # Build for Windows (amd64) - note the .exe extension
+          echo "Building for Windows amd64..."
+          GOOS=windows GOARCH=amd64 go build -o release-builds/n2w-windows-amd64.exe n2w.go
+
+          echo "Builds complete."
+          ls -l release-builds # List builds for verification in logs
+
+      # 5. Create a GitHub Release and upload build artifacts
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          # Use the tag generated in the previous step
+          tag_name: ${{ steps.tag_generator.outputs.tag_name }}
+          name: Release ${{ steps.tag_generator.outputs.tag_name }}
+          body: |
+            Automated release triggered by push to main branch.
+            Contains builds for Linux, macOS (amd64/arm64), and Windows (amd64).
+          draft: false      # Set to true if you want to manually publish later
+          prerelease: false # Set to true if this is a pre-release
+          # Specify the files to upload (all files in the release-builds directory)
+          files: release-builds/*
+        env:
+          # The GITHUB_TOKEN is automatically provided by GitHub Actions
+          # It has the necessary permissions because we set `permissions: contents: write` above
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
