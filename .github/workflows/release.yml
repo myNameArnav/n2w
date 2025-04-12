@@ -22,7 +22,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21' # Specify your project's Go version
+          go-version: '1.24.2' # Specify your project's Go version
 
       # 3. Generate a unique tag name based on timestamp
       #    We use an 'id' so we can reference the output in later steps
